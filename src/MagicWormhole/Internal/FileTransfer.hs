@@ -25,14 +25,22 @@ import Data.Aeson
 --
 -- Currently only supports sending simple text messages. A full version would
 -- also support sending files and directories.
-newtype Offer
+data Offer
   -- | A simple text message.
-  = Message Text deriving (Eq, Show)
+  = Message Text
+  | File Text Int
+  deriving (Eq, Show)
 
 instance ToJSON Offer where
   toJSON (Message text) = object [ "offer" .= object [ "message" .= text ] ]
+  toJSON (File name size) = object [ "offer" .= object [ "file" .= object [ "filename" .= name, "filesize" .= size ] ] ]
 
 instance FromJSON Offer where
   parseJSON = withObject "Offer" $ \obj -> do
     offer <- obj .: "offer"
-    Message <$> offer .: "message"
+    asum [ Message <$> offer .: "message"
+         , do
+             offerObj <- obj .: "offer"
+             fileObj <- offerObj .: "file"
+             File <$> fileObj .: "filename" <*> fileObj .: "filesize"
+         ]
