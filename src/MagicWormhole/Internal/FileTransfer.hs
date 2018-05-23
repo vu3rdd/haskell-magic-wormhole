@@ -91,7 +91,7 @@ instance FromJSON PortNumber where
   parseJSON = withScientific "PortNumber" (return . fromInteger . coefficient)
 
 instance ToJSON DirectTCPV1Hint where
-  toJSON = genericToJSON defaultOptions { sumEncoding = TaggedObject { tagFieldName = "type"}, constructorTagModifier = camelTo2 '_' }
+  toJSON = genericToJSON defaultOptions { sumEncoding = TaggedObject { tagFieldName = "type"}, constructorTagModifier = camelTo2 '-' }
 
 instance FromJSON DirectTCPV1Hint
 
