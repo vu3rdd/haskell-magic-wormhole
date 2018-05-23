@@ -25,6 +25,8 @@ import Data.Aeson
   , withScientific
   , Value(..)
   )
+import Data.Aeson.Types
+
 import Data.Scientific
   ( coefficient
   )
@@ -88,7 +90,9 @@ instance ToJSON PortNumber where
 instance FromJSON PortNumber where
   parseJSON = withScientific "PortNumber" (return . fromInteger . coefficient)
 
-instance ToJSON DirectTCPV1Hint
+instance ToJSON DirectTCPV1Hint where
+  toJSON = genericToJSON defaultOptions { sumEncoding = TaggedObject { tagFieldName = "type"}, constructorTagModifier = camelTo2 '_' }
+
 instance FromJSON DirectTCPV1Hint
 
 data TorTCPV1Hint = TorTCPV1Hint { hostname :: HostAddress
@@ -122,4 +126,5 @@ build_direct_hints = do
 -- TODO: not implemented yet
 build_relay_hints :: IO [RelayV1Hint]
 build_relay_hints = return []
+
 
