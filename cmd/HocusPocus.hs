@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 -- | Command-line tool for opening and communicating through magic wormholes.
 --
 -- Intended to inter-operate with the `wormhole` command-line tool from
@@ -11,6 +12,8 @@ import qualified Options.Applicative as Opt
 import qualified Crypto.Spake2 as Spake2
 import qualified Data.Aeson as Aeson
 import qualified Data.Text as Text
+import qualified System.FilePath.Posix as Posix
+import System.Posix.Files (getFileStatus, fileSize)
 
 import qualified MagicWormhole
 
@@ -116,6 +119,24 @@ bounce endpoint appID = do
         Right (MagicWormhole.Message message) -> pure message
 
     password = Spake2.makePassword "potato"
+
+-- | Send a file to a Magic Wormhole peer.
+sendFile :: MagicWormhole.Session -> Password -> Posix.FilePath -> IO ()
+sendFile session password filepath = do
+  nameplate <- MagicWormhole.allocate session
+  mailbox <- MagicWormhole.claim session nameplate
+  peer <- MagicWormhole.open session mailbox
+  let (MagicWormhole.Nameplate n) = nameplate
+  MagicWormhole.withEncryptedConnection peer (Spake2.makePassword (toS n <> "-" <> password))
+    (\conn -> do
+        -- TODO: 1. create transit message with abilities and hints
+        -- TODO: 2. derive transit key
+        -- send offer message
+        let filename = Posix.takeFileName filepath
+        offer <- MagicWormhole.File <$> (pure . toS) filename <*> (fileSize <$> getFileStatus filepath)
+        MagicWormhole.sendMessage conn (MagicWormhole.PlainText (toS (Aeson.encode offer)))
+        -- TODO: read message and look for transit type followed by answer type.
+    )
 
 
 main :: IO ()

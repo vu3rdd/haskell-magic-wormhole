@@ -25,14 +25,17 @@ library:
     - bytestring
     - containers
     - cryptonite
+    - filepath
     - hashable
     - memory
     - network
     - network-uri
+    - network-info
     - pqueue
     - saltine
     - spake2 >= 0.4
     - stm
+    - unix
     - unordered-containers
     - websockets
 

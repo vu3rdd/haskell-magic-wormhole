@@ -40,8 +40,10 @@ library
     , memory
     , network
     , network-uri
+    , network-info
     , pqueue
     , saltine
+    , scientific
     , spake2 >= 0.4
     , stm
     , unordered-containers
@@ -69,10 +71,12 @@ executable hocus-pocus
       base
     , protolude >= 0.2
     , aeson
+    , filepath
     , magic-wormhole
     , optparse-applicative
     , spake2 >= 0.4
     , text
+    , unix
   default-language: Haskell2010
 
 test-suite tasty
