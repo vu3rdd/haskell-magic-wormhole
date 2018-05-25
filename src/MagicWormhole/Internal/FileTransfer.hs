@@ -10,6 +10,7 @@
 -- you can send an 'Offer' to share a simple text message.
 module MagicWormhole.Internal.FileTransfer
   ( Offer(..)
+  , buildTransitJson
   ) where
 
 import Protolude
@@ -24,6 +25,8 @@ import Data.Aeson
   , withObject
   , withScientific
   , Value(..)
+  , pairs
+  , encode
   )
 import Data.Aeson.Types
 
@@ -52,7 +55,7 @@ import Network.Info
   , NetworkInterface(..)
   , IPv4 (..)
   )
-
+import Data.Map as Map
 import System.Posix.Types (FileOffset)
 
 -- | An offer made by a sender as part of the Magic Wormhole file transfer protocol.
@@ -79,10 +82,10 @@ instance FromJSON Offer where
              File <$> fileObj .: "filename" <*> (toEnum <$> (fileObj .: "filesize"))
          ]
 
-data DirectTCPV1Hint = DirectTCPV1Hint { hostname :: HostAddress
-                                       , port :: PortNumber
-                                       , priority :: Int
-                                       } deriving (Show, Eq, Generic)
+data DirectTCPV1Hint = DirectTcpV1 { hostname :: HostAddress
+                                   , port :: PortNumber
+                                   , priority :: Int
+                                   } deriving (Show, Eq, Generic)
 
 instance ToJSON PortNumber where
   toJSON n = toJSON $ toInteger n
@@ -91,7 +94,7 @@ instance FromJSON PortNumber where
   parseJSON = withScientific "PortNumber" (return . fromInteger . coefficient)
 
 instance ToJSON DirectTCPV1Hint where
-  toJSON = genericToJSON defaultOptions { sumEncoding = TaggedObject { tagFieldName = "type"}, constructorTagModifier = camelTo2 '-' }
+  toJSON = genericToJSON defaultOptions { sumEncoding = TaggedObject { tagFieldName = "type"}, constructorTagModifier = camelTo2 '-', tagSingleConstructors = True }
 
 instance FromJSON DirectTCPV1Hint
 
@@ -103,28 +106,29 @@ data RelayV1Hint = RelayV1Hint { hints :: (DirectTCPV1Hint, TorTCPV1Hint) }
 
 allocateTcpPort :: IO PortNumber
 allocateTcpPort = do
-  s@(MkSocket fd fam stype _ _) <- socket AF_INET Stream defaultProtocol
-  r <- setSocketOption s ReuseAddr 1
+  s <- socket AF_INET Stream defaultProtocol
+  _ <- setSocketOption s ReuseAddr 1
   _ <- bind s (SockAddrInet 0 0x0100007f) -- 127.0.0.1
-  port <- socketPort s
+  p <- socketPort s
   close s
-  return port
+  return p
 
-build_direct_hints :: IO [DirectTCPV1Hint]
-build_direct_hints = do
+buildDirectHints :: IO [DirectTCPV1Hint]
+buildDirectHints = do
   portnum <- allocateTcpPort
   nwInterfaces <- getNetworkInterfaces
   let nonLoopbackInterfaces =
-        filter (\nwInterface -> let (IPv4 addr4) = ipv4 nwInterface in addr4 /= 0x0100007f) nwInterfaces
-  return $ map (\nwInterface ->
+        Protolude.filter (\nwInterface -> let (IPv4 addr4) = ipv4 nwInterface in addr4 /= 0x0100007f) nwInterfaces
+  return $ Protolude.map (\nwInterface ->
                   let (IPv4 addr4) = ipv4 nwInterface in
-                  DirectTCPV1Hint { hostname = addr4
-                                  , port = portnum
-                                  , priority = 0 }) nonLoopbackInterfaces
+                  DirectTcpV1 { hostname = addr4
+                              , port = portnum
+                              , priority = 0 }) nonLoopbackInterfaces
 
-
--- TODO: not implemented yet
-build_relay_hints :: IO [RelayV1Hint]
-build_relay_hints = return []
-
+buildTransitJson :: IO LByteString
+buildTransitJson = do
+  hs <- buildDirectHints
+  return $ encode $ object [ "abilities-v1" .= abilities,
+                             "hints-v1" .= hs ]
+  where abilities = Map.fromList [("type" :: Text, "direct-tcp-v1" :: Text)]
 
